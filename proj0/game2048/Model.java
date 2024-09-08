@@ -3,7 +3,6 @@ package game2048;
 import java.util.Formatter;
 import java.util.Observable;
 
-
 /** The state of a game of 2048.
  *  @author TODO: YOUR NAME HERE
  */
@@ -94,6 +93,33 @@ public class Model extends Observable {
         setChanged();
     }
 
+    /**
+     * Return the topmost row in a col that is NOT occupied by a Tile
+     */
+    public int getHighestEmptyRow(int col){
+        int i = 0;
+        for (int row = 0; row < board.size(); row++){
+            if (board.tile(col, row) == null){
+                i = row;
+            }
+        }
+        return i;
+    }
+
+    /**
+     * Return the nearest upper row in a col that is occupied by a Tile
+     */
+    public int getClosestOccupiedRow(int col, int currentRow){
+        int i = currentRow;
+        while (i < board.size()){
+            if (board.tile(col, i) != null){
+                return i;
+            }
+            i++;
+        }
+        return board.size() - 1;
+    }
+
     /** Tilt the board toward SIDE. Return true iff this changes the board.
      *
      * 1. If two Tile objects are adjacent in the direction of motion and have
@@ -113,6 +139,45 @@ public class Model extends Observable {
         // TODO: Modify this.board (and perhaps this.score) to account
         // for the tilt to the Side SIDE. If the board changed, set the
         // changed local variable to true.
+
+        board.setViewingPerspective(side);
+
+        for (int col = 0; col < board.size(); col++){
+
+            Tile currentTile = null, upperTile = null;
+            boolean[] justMerged = new boolean[]{false, false, false, false};
+            int highestEmptyRow = getHighestEmptyRow(col);
+            int closestOccupiedRow = 0;
+
+            // iterate from top to bottom
+            for (int row = board.size() - 1; row >= 0; row--){
+
+                // assign the Tile at (col, row) to currentTile
+                currentTile = board.tile(col, row);
+
+                // verify that (col, row) is occupied by a Tile
+                if (currentTile != null){
+                    // moving + merging Tiles
+                    if (upperTile != null && upperTile.value() == currentTile.value() && !justMerged[closestOccupiedRow]){
+                        board.move(col, closestOccupiedRow, currentTile);
+                        score += 2*currentTile.value();
+                        highestEmptyRow = getHighestEmptyRow(col);
+                        justMerged[closestOccupiedRow] = true;
+                        changed = true;
+                    } else if (row < highestEmptyRow){
+                        // moving Tiles without merging
+                        board.move(col, highestEmptyRow, currentTile);
+                        highestEmptyRow = getHighestEmptyRow(col);
+                        changed = true;
+                    }
+                    // update closestOccupiedRow and assign the Tile at closestOccupiedRow to upperTile
+                    closestOccupiedRow = getClosestOccupiedRow(col, row);
+                    upperTile = board.tile(col, closestOccupiedRow);
+                }
+            }
+        }
+
+        board.setViewingPerspective(Side.NORTH);
 
         checkGameOver();
         if (changed) {
@@ -138,6 +203,14 @@ public class Model extends Observable {
      * */
     public static boolean emptySpaceExists(Board b) {
         // TODO: Fill in this function.
+        // return false;
+        for (int row = 0; row < b.size(); row++){
+            for (int col = 0; col < b.size(); col++){
+                if (b.tile(col, row) == null){
+                    return true;
+                }
+            }
+        }
         return false;
     }
 
@@ -148,7 +221,40 @@ public class Model extends Observable {
      */
     public static boolean maxTileExists(Board b) {
         // TODO: Fill in this function.
+        // return false;
+        for (int row = 0; row < b.size(); row++){
+            for (int col = 0; col < b.size(); col++){
+                Tile currentTile = b.tile(col, row);
+                if (currentTile != null && currentTile.value() == MAX_PIECE){
+                    return true;
+                }
+            }
+        }
         return false;
+    }
+
+    /**
+     * Symbolic names for adjacent Tiles and their offsets in rows or columns
+     */
+    public enum Direction{
+        NORTH(-1, 0), SOUTH(1, 0), EAST(0, -1), WEST(0, 1);
+
+        Direction(int row, int col) {
+            this.row = row;
+            this.col = col;
+        }
+
+        private int row, col;
+    }
+
+    /**
+     * Returns the d adjacent Tile of a Tile at currentCol and currentRow.
+     * If the d adjacent Tile is out of bounds, return null instead.
+     */
+    public static Tile getAdjacentTile(int currentCol, int currentRow, Direction d, Board b){
+        if (0 < (currentCol + d.col) && (currentCol + d.col) < b.size() && 0 < (currentRow + d.row) && (currentRow + d.row) < b.size()) {
+            return b.tile(currentCol + d.col, currentRow + d.row);
+        } return null;
     }
 
     /**
@@ -159,7 +265,22 @@ public class Model extends Observable {
      */
     public static boolean atLeastOneMoveExists(Board b) {
         // TODO: Fill in this function.
-        return false;
+        // return false;
+        if (emptySpaceExists(b)){
+            return true;
+        } else {
+            for (int row = 0; row < b.size(); row++){
+                for (int col = 0; col < b.size(); col++){
+                    Tile currentTile = b.tile(col, row);
+                    for (int i = 0; i < 4; i++){
+                        Tile adjacentTile = getAdjacentTile(col, row, Direction.values()[i], b);
+                        if (adjacentTile != null && adjacentTile.value() == currentTile.value()){
+                            return true;
+                        }
+                    }
+                }
+            }
+        } return false;
     }
 
 
